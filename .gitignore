@@ -1,0 +1,49 @@
+# Git Ignore for Quadcopter Project
+
+# Build & Compilation artifacts
+**/build/
+*.elf
+*.bin
+*.hex
+*.eep
+*.o
+*.a
+*.so
+compile_commands.json
+includes.cache
+libraries.cache
+build.options.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.venv
+venv/
+ENV/
+
+# MATLAB / Simulink
+*.asv
+*.slxc
+slprj/
+*.autosave
+*.m~
+
+# OS & Editor Files
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# External cloned reference repos (save repo size, tracked upstream)
+reference/
+
+# Large temporary flight logs (optional: keep sample logs or ignore runtime logs)
+logs/*.csv
+!logs/flight_log_sample.csv
+
+# Raw photo dumps in root (organized copies are in docs/images/)
+IMG_*.jpg
