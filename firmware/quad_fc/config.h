@@ -16,17 +16,15 @@
 
 #define ESC_MIN_US      1000   // disarmed / zero throttle
 #define ESC_MAX_US      2000
-#define MOTOR_IDLE_US   1100   // minimum output while armed (motors just spinning)
-// Hard cap on the throttle command. Raise gradually during tests on the rig.
-#define THR_MAX_US      1400
+#define MOTOR_IDLE_US   1050   // low floor while armed so slowed-down motors visibly slow down
+// Hard cap on the throttle command. Raised to 1750 us for full hover lift on the tether rig.
+#define THR_MAX_US      1750
 #define THR_ARM_MAX_US  1050   // throttle must be below this to arm
 
 // Mixer: motor_i = thr + MIX_R[i]*roll + MIX_P[i]*pitch + MIX_Y[i]*yaw
-//   +roll  = right side goes DOWN  (speed up left motors)
-//   +pitch = nose goes UP          (speed up front motors)
-//   +yaw   = counter-clockwise seen from above (speed up CW-spinning motors)
-// Assumes the props: FL and RR spin CW, FR and RL spin CCW (standard).
-// Verify direction with the props OFF (ESC_TEST) and flip signs here if needed.
+//   +roll  = right side goes DOWN  (speed up right motors M0, M3 when u_r < 0)
+//   +pitch = nose goes UP          (speed up rear motors M2, M3 when u_p < 0)
+//   +yaw   = CCW seen from above   (speed up CW motors M1, M3 when u_y > 0)
 static const int8_t MIX_R[4] = { -1, +1, +1, -1 };
 static const int8_t MIX_P[4] = { +1, +1, -1, -1 };
 static const int8_t MIX_Y[4] = { -1, +1, -1, +1 };
@@ -45,7 +43,7 @@ static const int8_t MIX_Y[4] = { -1, +1, -1, +1 };
 #define IMU_SWAP_RP   1
 #define ROLL_SIGN   (-1.0f)
 #define PITCH_SIGN  (+1.0f)
-#define YAW_SIGN    (-1.0f)     // BNO055/BNO085 heading sign
+#define YAW_SIGN    (+1.0f)     // BNO085 quaternion yaw is +CCW (matches +CCW gyro Z)
 #define GYRO_ROLL_SIGN   (-1.0f)
 #define GYRO_PITCH_SIGN  (+1.0f)
 #define GYRO_YAW_SIGN    (+1.0f)
@@ -64,9 +62,10 @@ static const int8_t MIX_Y[4] = { -1, +1, -1, +1 };
 #define MAX_TILT_ARM_DEG   20.0f   // must be within +/-20 deg to arm (or send CAL to level)
 #define MAX_TILT_CUT_DEG   55.0f   // above this angle -> immediate disarm
 #define MAX_ANGLE_SP_DEG   20.0f   // limit for commanded roll/pitch
+#define SP_SLEW_DPS        22.0f   // max setpoint ramp rate (deg/s) so +5 <-> -5 reversals don't slam
 #define MAX_RATE_SP_DPS    150.0f  // limit on the rate setpoint from the angle loop
 #define MAX_YAW_RATE_DPS   90.0f
-#define MAX_CTRL_OUT_US    250.0f  // limit of each axis correction (us)
+#define MAX_CTRL_OUT_US    220.0f  // full balancing torque with mild safety cap (was 250)
 
 // ---------------------------------------------------------------- Controller gains (from MATLAB design_gains.m)
 // Analytical MATLAB values:
@@ -74,16 +73,18 @@ static const int8_t MIX_Y[4] = { -1, +1, -1, +1 };
 //   rate_kp = 0.5656, rate_ki = 1.6969, rate_kd = 0.0113
 //   yawr_kp = 5.7269, yawr_ki = 9.1630, yawr_kd = 0.1145
 // Outer loop: angle P (deg -> deg/s)
-#define ANG_KP        3.75f
-#define YAW_ANG_KP    2.00f
+#define ANG_KP        2.80f    // tuned on the rig (screenshot 2026-11-14): calm outer loop
+#define YAW_ANG_KP    2.60f    // firmer heading lock to hold Yaw near 0 deg
 // Inner loop: rate PID (deg/s -> us of motor command)
-#define RATE_KP       0.5656f
-#define RATE_KI       0.50f    // conservative starting I (raise toward 1.6969f on rig)
-#define RATE_KD       0.0113f
-#define YAWRATE_KP    2.00f    // conservative starting yaw P (raise toward 5.7269f on rig)
-#define YAWRATE_KI    0.30f
-#define YAWRATE_KD    0.05f
-#define RATE_I_LIMIT  80.0f   // anti-windup clamp of the integral term (us)
-#define D_LPF_ALPHA   0.2f    // low-pass on the derivative (0..1, smaller = smoother)
+#define RATE_KP       2.60f    // tuned on the rig: stiff inner rate hold
+#define RATE_KI       0.80f    // tuned on the rig: cancels CG & rig tilt offset
+#define RATE_KD       0.150f   // tuned on the rig: damping on fresh 100 Hz gyro samples
+#define YAWRATE_KP    3.00f    // stronger yaw rate damping against roll-induced yaw kicks
+#define YAWRATE_KI    0.65f    // absorbs ~45-55 us CW/CCW drag asymmetry quickly above 1300 us
+#define YAWRATE_KD    0.00f
+#define RATE_I_LIMIT  40.0f    // anti-windup clamp of roll/pitch integral term (us)
+#define YAW_I_LIMIT   80.0f    // large enough to hold full CW/CCW steady drag offset
+#define MAX_YAW_OUT_US 115.0f  // leaves ~65+ us dynamic yaw authority above steady bias
+#define D_LPF_ALPHA   0.30f    // low-pass on fresh 100 Hz derivative (0..1, smaller = smoother)
 
 #endif

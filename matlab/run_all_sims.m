@@ -11,11 +11,12 @@
 
 clear; clc; close all;
 addpath(fileparts(mfilename('fullpath')));
-res_dir = fullfile(fileparts(mfilename('fullpath')), 'results');
+res_dir = fullfile(fileparts(mfilename('fullpath')), 'results', 'hw');
 if ~exist(res_dir, 'dir'), mkdir(res_dir); end
 
 p        = params();
-ctrl_pid = design_gains(p, 'PID');
+use_hw   = true;   % true: hardware-tuned firmware gains (config.h); false: model-based design
+ctrl_pid = design_gains(p, 'PID', struct('hw', use_hw));
 ctrl_lqr = design_gains(p, 'LQR');
 
 fprintf('=== FIRMWARE EQUIVALENT GAINS (for firmware/quad_fc/config.h) ===\n');

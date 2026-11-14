@@ -3,6 +3,8 @@ function ctrl = design_gains(p, type, opts)
 %   ctrl = design_gains(p)               cascaded PID (default)
 %   ctrl = design_gains(p,'LQR')         LQR with integral action (comparison controller)
 %   opts.wr   rate-loop bandwidth [rad/s] (default 15)   opts.wy yaw rate bandwidth (default 8)
+%   opts.hw   true -> use the hardware-tuned firmware gains (ang 2.80/2.60, rate 2.60/0.80/0.150,
+%             yaw rate 3.00/0.65/0) converted to physical units (PID only)
 %
 % Design idea (cascaded PID):
 %   Inner rate loop. Plant: tau -> body rate  =  1/(J s)  (ignoring the motor lag).
@@ -41,6 +43,18 @@ switch ctrl.type
         ctrl.Kp   = J.*w;                 % [N m /(rad/s)]
         ctrl.Ki   = ctrl.Kp.*w/5;
         ctrl.Kd   = ctrl.Kp*opts.Td;
+        if isfield(opts,'hw') && opts.hw
+            % Use the gains hard-coded in firmware/quad_fc/config.h (us per deg/s) -> N m per rad/s
+            k_hw = [1000/(4*p.d*p.Tmax), 1000/(4*p.d*p.Tmax), 1000/(4*p.kq*p.Tmax)];  % us per N m
+            r2d  = 180/pi;
+            ctrl.Kang = [2.80 2.80 2.60];
+            ctrl.Kp   = [2.60 2.60 3.00] * r2d ./ k_hw;
+            ctrl.Ki   = [0.80 0.80 0.65] * r2d ./ k_hw;
+            ctrl.Kd   = [0.150 0.150 0.00] * r2d ./ k_hw;
+            ctrl.Ilim    = [40 40 80]   ./ k_hw;     % RATE_I_LIMIT, YAW_I_LIMIT
+            ctrl.tau_max = [220 220 115] ./ k_hw;    % MAX_CTRL_OUT_US, MAX_YAW_OUT_US
+            ctrl.d_alpha = 0.30;                     % D_LPF_ALPHA
+        end
     case 'LQR'
         % Per axis: x = [integral of angle error; angle error; rate], u = torque
         ctrl.Klqr = zeros(3,3);

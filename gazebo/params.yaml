@@ -1,0 +1,47 @@
+# Single source of truth for the Gazebo model + firmware-mirror controller.
+# Plant values come from matlab/params.m (still ESTIMATES until measured on hardware).
+# Controller values come from firmware/quad_fc/config.h (as flashed on 2026-11-14).
+plant:
+  mass: 1.10            # kg   total (matlab/params.m p.m)
+  arm_L: 0.225          # m    motor-to-centre (F450, 450 mm diagonal)
+  Ixx: 0.0110           # kg m^2
+  Iyy: 0.0110
+  Izz: 0.0210
+  Tmax: 8.0             # N    per-motor thrust at 2000 us (linear in command, as in MATLAB)
+  kq: 0.016             # m    yaw torque / thrust
+  tau_m: 0.05           # s    motor + ESC lag
+  cd: 0.10              # N s/m linear drag (applied by fc_sim.py)
+  rotor_mass: 0.05      # kg   A2212 + prop (inertia of base is reduced so total J matches)
+  g: 9.81
+  esc_trim_us: [0, 0, 0, 0]   # firmware has {35,0,0,0} to fix a real ESC deadband; ideal ESCs in sim
+sensors:
+  imu_rate_hz: 100      # BNO085 fresh-sample rate seen by the D term
+  sig_ang_deg: 0.15
+  sig_gyro_dps: 0.40
+controller:             # firmware/quad_fc/config.h
+  loop_hz: 200
+  esc_min_us: 1000
+  esc_max_us: 2000
+  motor_idle_us: 1050
+  thr_max_us: 1750
+  ang_kp: 2.80
+  yaw_ang_kp: 2.60
+  rate_kp: 2.60
+  rate_ki: 0.80
+  rate_kd: 0.150
+  yawr_kp: 3.00
+  yawr_ki: 0.65
+  yawr_kd: 0.00
+  rate_i_limit: 40.0
+  yaw_i_limit: 80.0
+  max_ctrl_out_us: 220.0
+  max_yaw_out_us: 115.0
+  max_rate_sp_dps: 150.0
+  max_yaw_rate_dps: 90.0
+  d_lpf_alpha: 0.30
+  sp_slew_dps: 22.0
+  max_angle_sp_deg: 20.0
+  max_tilt_cut_deg: 55.0
+  mix_r: [-1, 1, 1, -1]     # M0 FR, M1 FL, M2 RL, M3 RR
+  mix_p: [1, 1, -1, -1]
+  mix_y: [-1, 1, -1, 1]

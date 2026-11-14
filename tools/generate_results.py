@@ -41,6 +41,27 @@ Kp_rate = Jd * w_vec
 Ki_rate = Kp_rate * (w_vec / 5.0)
 Kd_rate = Kp_rate * Td
 Ilim_rate = 0.5 * tau_max
+D_ALPHA = 0.2
+
+# GAINS=hw (default) -> gains hard-coded in firmware/quad_fc/config.h (us per deg/s) converted
+# to physical units; GAINS=design -> the original model-based design above. Figures for the
+# hardware gains go to matlab/results/hw/ so the design figures are not overwritten.
+GAINS = os.environ.get("GAINS", "hw").lower()
+if GAINS == "hw":
+    k_us = np.array([1000.0 / (4 * d * Tmax), 1000.0 / (4 * d * Tmax), 1000.0 / (4 * kq * Tmax)])  # us per N m
+    r2d = 180.0 / np.pi
+    fw = dict(ang_kp=2.80, yaw_ang_kp=2.60, rate_kp=2.60, rate_ki=0.80, rate_kd=0.150,
+              yawr_kp=3.00, yawr_ki=0.65, yawr_kd=0.00)
+    Kang = np.array([fw["ang_kp"], fw["ang_kp"], fw["yaw_ang_kp"]])
+    Kp_rate = np.array([fw["rate_kp"], fw["rate_kp"], fw["yawr_kp"]]) * r2d / k_us
+    Ki_rate = np.array([fw["rate_ki"], fw["rate_ki"], fw["yawr_ki"]]) * r2d / k_us
+    Kd_rate = np.array([fw["rate_kd"], fw["rate_kd"], fw["yawr_kd"]]) * r2d / k_us
+    Ilim_rate = np.array([40.0, 40.0, 80.0]) / k_us          # RATE_I_LIMIT, YAW_I_LIMIT
+    tau_max = np.array([220.0, 220.0, 115.0]) / k_us         # MAX_CTRL_OUT_US, MAX_YAW_OUT_US
+    D_ALPHA = 0.30
+    RESULTS_DIR = os.path.join(RESULTS_DIR, "hw")
+    os.makedirs(RESULTS_DIR, exist_ok=True)
+print(f"[generate_results] gains = {GAINS}; Kp_rate={Kp_rate}, Ki_rate={Ki_rate}, Kd_rate={Kd_rate}, Kang={Kang}")
 alt_cfg = dict(kp=12.0, ki=6.0, kd=11.0, ilim=0.60 * hover)
 
 
@@ -158,7 +179,7 @@ def sim_quad(controller="PID", t_end=8.0,
                 e_rate = r_sp - rate_m
                 I_rate = np.clip(I_rate + Ki_rate * e_rate * Ts, -Ilim_rate, Ilim_rate)
                 d_raw = -(rate_m - prev_rate) / Ts
-                d_filt += 0.2 * (d_raw - d_filt)
+                d_filt += D_ALPHA * (d_raw - d_filt)
                 prev_rate = rate_m.copy()
                 tau_cmd = np.clip(Kp_rate * e_rate + I_rate + Kd_rate * d_filt, -tau_max, tau_max)
 

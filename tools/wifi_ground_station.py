@@ -44,6 +44,7 @@ class SerialBridge:
             "thr": 1000, "m": [1000, 1000, 1000, 1000]
         }
         self.keepalive_enabled = False
+        self.last_tx_time = 0.0
         self.log_path = os.path.join(LOGS_DIR, f"flight_log_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
         self.log_file = open(self.log_path, "a", buffering=1)
         self.connect()
@@ -97,7 +98,13 @@ class SerialBridge:
                 self.connect()
             if self.fd is not None:
                 try:
+                    # Pace rapid non-emergency commands so Mega's 64-byte UART RX buffer never drops bytes
+                    if cmd.upper() not in ("STOP", "DISARM"):
+                        gap = time.monotonic() - self.last_tx_time
+                        if gap < 0.025:
+                            time.sleep(0.025 - gap)
                     os.write(self.fd, (cmd + "\n").encode("utf-8"))
+                    self.last_tx_time = time.monotonic()
                 except Exception as e:
                     self._append_line(f"[ERR] Write failed: {e}")
                     self.connect()
@@ -190,6 +197,7 @@ HTML_PAGE = """<!DOCTYPE html>
   <div class="card">
     <h2>1. Live Attitude &amp; Motors</h2>
     <div id="state_badge" class="stat" style="color:#fbbf24">DISARMED</div>
+    <div id="imu_badge" style="font-size:13px;font-weight:700;margin:4px 0;color:#fbbf24">IMU: CHECKING...</div>
     <p class="stat">Roll: <span id="roll">0.0</span>&deg; | Pitch: <span id="pitch">0.0</span>&deg; | Yaw: <span id="yaw">0.0</span>&deg;</p>
     <p class="stat">Thr: <span id="thr">1000</span> us</p>
     <p style="font-family:monospace">M0(FR,Pin9): <span id="m0">1000</span> | M1(FL,Pin8): <span id="m1">1000</span><br>
@@ -210,20 +218,86 @@ HTML_PAGE = """<!DOCTYPE html>
   </div>
 
   <div class="card">
-    <h2>3. Flight Control (Tether Rig)</h2>
-    <button class="btn-arm" onclick="send('THR:1000');setTimeout(()=>send('ARM'),100)">ARM</button>
-    <button class="btn-disarm" onclick="send('DISARM')">DISARM</button>
+    <h2>3. Flight Control (Tether Rig — Up to 1700 us)</h2>
+    <button class="btn-arm" onclick="document.getElementById('thr_slider').value=140;document.getElementById('thr_lbl').textContent='140 (1095 us)';send('THR:1000');setTimeout(()=>send('ARM'),100)">ARM (Slow Spin)</button>
+    <button class="btn-disarm" onclick="document.getElementById('thr_slider').value=0;document.getElementById('thr_lbl').textContent='0 (1000 us)';send('DISARM')">DISARM</button>
     <button class="btn-cmd" onclick="send('UP')">THR UP (+10)</button>
     <button class="btn-cmd" onclick="send('DOWN')">THR DOWN (-10)</button>
-    <br><br>
-    <button class="btn-sec" onclick="send('ROLL:0');send('PITCH:0')">Level (0&deg;)</button>
-    <button class="btn-sec" onclick="send('ROLL:10')">Roll +10&deg;</button>
-    <button class="btn-sec" onclick="send('ROLL:-10')">Roll -10&deg;</button>
-    <button class="btn-sec" onclick="send('PITCH:10')">Pitch +10&deg;</button>
+    <div style="margin:12px 0;padding:8px;background:#111827;border-radius:8px">
+      <label style="font-size:14px;font-weight:600">Speed Slider (0 - 1000 &rarr; 1000 - 1700 us): <span id="thr_lbl">0 (1000 us)</span></label><br>
+      <input id="thr_slider" type="range" min="0" max="1000" step="20" value="0" style="width:100%;margin-top:6px"
+        oninput="const us=Math.round(1000+this.value*0.7);document.getElementById('thr_lbl').textContent=this.value+' ('+us+' us)';send('THR:'+us)">
+    </div>
+    <div style="margin:10px 0;padding:10px;background:#111827;border-radius:8px;font-size:13px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <b>Attitude Setpoint Sliders (&plusmn;20&deg;)</b>
+        <button class="btn-cmd" style="padding:5px 10px;font-size:12px;margin:0" onclick="levelAll()">Level All (0&deg;)</button>
+      </div>
+      <div style="margin:6px 0">
+        <label>Roll SP (-20&deg;..+20&deg;): <b id="r_sp_lbl" style="color:#93c5fd">0&deg;</b></label>
+        <input id="r_slider" type="range" min="-20" max="20" step="1" value="0" style="width:100%"
+          oninput="setAngle('ROLL',this.value,'r_sp_lbl')">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('r_slider',-10,'ROLL','r_sp_lbl')">-10&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('r_slider',-5,'ROLL','r_sp_lbl')">-5&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('r_slider',0,'ROLL','r_sp_lbl')">0&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('r_slider',5,'ROLL','r_sp_lbl')">+5&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('r_slider',10,'ROLL','r_sp_lbl')">+10&deg;</button>
+        </div>
+      </div>
+      <div style="margin:8px 0">
+        <label>Pitch SP (-20&deg;..+20&deg;): <b id="p_sp_lbl" style="color:#93c5fd">0&deg;</b></label>
+        <input id="p_slider" type="range" min="-20" max="20" step="1" value="0" style="width:100%"
+          oninput="setAngle('PITCH',this.value,'p_sp_lbl')">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('p_slider',-10,'PITCH','p_sp_lbl')">-10&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('p_slider',-5,'PITCH','p_sp_lbl')">-5&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('p_slider',0,'PITCH','p_sp_lbl')">0&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('p_slider',5,'PITCH','p_sp_lbl')">+5&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('p_slider',10,'PITCH','p_sp_lbl')">+10&deg;</button>
+        </div>
+      </div>
+      <div style="margin:8px 0 2px 0">
+        <label>Yaw SP (-20&deg;..+20&deg;, &plusmn;10&deg; steps): <b id="y_sp_lbl" style="color:#93c5fd">0&deg;</b></label>
+        <input id="y_slider" type="range" min="-20" max="20" step="10" value="0" style="width:100%"
+          oninput="setAngle('YAW',this.value,'y_sp_lbl')">
+        <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',-20,'YAW','y_sp_lbl')">-20&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',-10,'YAW','y_sp_lbl')">-10&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',0,'YAW','y_sp_lbl')">0&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',10,'YAW','y_sp_lbl')">+10&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',20,'YAW','y_sp_lbl')">+20&deg;</button>
+          <button class="btn-cmd" style="padding:4px 8px;font-size:12px" onclick="stepYaw(-10)">Yaw -10&deg; Step</button>
+          <button class="btn-cmd" style="padding:4px 8px;font-size:12px" onclick="stepYaw(10)">Yaw +10&deg; Step</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="card">
-    <h2>4. Serial Console &amp; Custom Command</h2>
+    <h2>4. Live PID Tuning &amp; Yaw Lock (Instant, No Re-Upload!)</h2>
+    <p style="font-size:12px;color:#9ca3af;margin:0 0 6px 0">1-Click Presets (takes effect immediately):</p>
+    <button class="btn-arm" onclick="setPID(2.60,1.65,0.20,0.022)">Calmer (2.60 / 0.20)</button>
+    <button class="btn-cmd" onclick="setPID(2.80,2.60,0.80,0.150)">Tuned (Hardcoded Default)</button>
+    <button class="btn-sec" onclick="setPID(4.20,1.95,0.50,0.032)">Sharp (High Stiffness)</button>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:8px 0;font-size:12px">
+      <label>ANG_KP <input id="g_akp" type="number" step="0.1" value="2.80" style="width:65px;background:#111827;color:white;border:1px solid #4b5563;border-radius:4px;padding:3px"></label>
+      <label>RATE_KP <input id="g_rkp" type="number" step="0.05" value="2.60" style="width:65px;background:#111827;color:white;border:1px solid #4b5563;border-radius:4px;padding:3px"></label>
+      <label>RATE_KI <input id="g_rki" type="number" step="0.05" value="0.80" style="width:65px;background:#111827;color:white;border:1px solid #4b5563;border-radius:4px;padding:3px"></label>
+      <label>RATE_KD <input id="g_rkd" type="number" step="0.002" value="0.150" style="width:65px;background:#111827;color:white;border:1px solid #4b5563;border-radius:4px;padding:3px"></label>
+    </div>
+    <button class="btn-cmd" onclick="applyCustomPID()">Apply PID Live</button>
+    <button class="btn-sec" onclick="send('GET')">Show Gains (GET)</button>
+    <div id="active_gains" style="font-size:11px;font-family:monospace;color:#10b981;margin:6px 0">Active: (click GET or Apply PID Live)</div>
+    <button class="btn-sec" onclick="send('SET:YAW_TRIM=-15')">Yaw Trim -15</button>
+    <button class="btn-sec" onclick="send('SET:YAW_TRIM=0')">Yaw Trim 0</button>
+    <button class="btn-sec" onclick="send('SET:YAW_TRIM=15')">Yaw Trim +15</button>
+    <button class="btn-sec" onclick="send('SET:YAW_DIR=1')">Yaw Dir +1</button>
+    <button class="btn-sec" onclick="send('SET:YAW_DIR=-1')">Yaw Dir -1</button>
+  </div>
+
+  <div class="card">
+    <h2>5. Serial Console &amp; Custom Command</h2>
     <div style="display:flex;gap:6px;margin-bottom:8px">
       <input id="cmd_in" style="flex:1;padding:8px;border-radius:6px;border:1px solid #4b5563;background:#111827;color:white" placeholder="e.g. GET or SET:RATE_KP=0.56">
       <button class="btn-cmd" onclick="send(document.getElementById('cmd_in').value)">Send</button>
@@ -236,6 +310,41 @@ async function send(c) {
   if (!c) return;
   await fetch('/api/cmd?c=' + encodeURIComponent(c));
 }
+function setAngle(axis, val, lblId) {
+  document.getElementById(lblId).innerHTML = val + '&deg;';
+  send(axis + ':' + val);
+}
+function setSlider(sliderId, val, axis, lblId) {
+  const el = document.getElementById(sliderId);
+  el.value = val;
+  setAngle(axis, val, lblId);
+}
+function stepYaw(delta) {
+  const el = document.getElementById('y_slider');
+  const next = Math.max(-20, Math.min(20, parseInt(el.value || '0', 10) + delta));
+  setSlider('y_slider', next, 'YAW', 'y_sp_lbl');
+}
+function levelAll() {
+  document.getElementById('r_slider').value = 0; document.getElementById('r_sp_lbl').innerHTML = '0&deg;';
+  document.getElementById('p_slider').value = 0; document.getElementById('p_sp_lbl').innerHTML = '0&deg;';
+  document.getElementById('y_slider').value = 0; document.getElementById('y_sp_lbl').innerHTML = '0&deg;';
+  send('ROLL:0'); send('PITCH:0'); send('YAW:0');
+}
+async function setPID(akp, rkp, rki, rkd) {
+  document.getElementById('g_akp').value = akp;
+  document.getElementById('g_rkp').value = rkp;
+  document.getElementById('g_rki').value = rki;
+  document.getElementById('g_rkd').value = rkd;
+  await applyCustomPID();
+}
+async function applyCustomPID() {
+  const akp = document.getElementById('g_akp').value;
+  const rkp = document.getElementById('g_rkp').value;
+  const rki = document.getElementById('g_rki').value;
+  const rkd = document.getElementById('g_rkd').value;
+  await send('PID:' + akp + ',' + rkp + ',' + rki + ',' + rkd);
+}
+let lastSig = '', staleTicks = 0;
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); send('STOP'); }
 });
@@ -247,6 +356,12 @@ setInterval(async () => {
     const sb = document.getElementById('state_badge');
     sb.textContent = t.armed ? 'ARMED (ACTIVE)' : 'DISARMED (SAFE)';
     sb.style.color = t.armed ? '#10b981' : '#fbbf24';
+    const sig = [t.roll, t.pitch, t.yaw, t.gx, t.gy, t.gz].join(',');
+    if (sig !== lastSig) { lastSig = sig; staleTicks = 0; } else { staleTicks++; }
+    const ib = document.getElementById('imu_badge');
+    if (t.t_ms === 0) { ib.textContent = 'IMU: WAITING FOR USB...'; ib.style.color = '#fbbf24'; }
+    else if (staleTicks >= 15) { ib.textContent = 'IMU FROZEN! (Check wires & click SCAN)'; ib.style.color = '#ef4444'; }
+    else { ib.textContent = 'IMU LIVE (50 Hz)'; ib.style.color = '#10b981'; }
     document.getElementById('roll').textContent = t.roll.toFixed(1);
     document.getElementById('pitch').textContent = t.pitch.toFixed(1);
     document.getElementById('yaw').textContent = t.yaw.toFixed(1);
@@ -255,6 +370,12 @@ setInterval(async () => {
     const con = document.getElementById('console');
     con.textContent = d.lines.join('\\n');
     con.scrollTop = con.scrollHeight;
+    for (let i = d.lines.length - 1; i >= 0; i--) {
+      if (d.lines[i].startsWith('GAINS ')) {
+        document.getElementById('active_gains').textContent = 'Active: ' + d.lines[i].slice(6);
+        break;
+      }
+    }
   } catch (e) {}
 }, 200);
 </script>
