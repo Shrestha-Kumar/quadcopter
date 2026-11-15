@@ -325,7 +325,7 @@ PANEL_HTML = r"""<!DOCTYPE html>
       </div>
       <div class="row">
         <span>Yaw SP</span>
-        <input id="yaw" type="range" min="-20" max="20" step="10" value="0" oninput="setMode('manual',true);set('yaw='+this.value);$('yl').textContent=this.value+'°'">
+        <input id="yaw" type="range" min="-180" max="180" step="10" value="0" oninput="setMode('manual',true);set('yaw='+this.value);$('yl').textContent=this.value+'°'">
         <span id="yl" class="val">0°</span>
       </div>
       <div style="display:flex;gap:4px;margin-top:4px;flex-wrap:wrap">

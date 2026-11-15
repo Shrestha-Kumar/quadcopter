@@ -148,4 +148,83 @@ xlabel('Time (s)'); ylabel('Angle (deg)'); title('Sinusoidal Reference Tracking 
 legend('Roll Ref','Roll','Pitch','Location','best');
 saveas(fig, fullfile(res_dir, 'fig3_robustness_and_actuators.png')); close(fig);
 
+%% 6. Hardware Flight Log Validation (Fig 4)
+hw_csv = fullfile(fileparts(mfilename('fullpath')), 'final_flight_log.csv');
+if ~exist(hw_csv, 'file')
+    hw_csv = fullfile(fileparts(mfilename('fullpath')), '..', 'logs', 'final_flight_log.csv');
+end
+if exist(hw_csv, 'file')
+    fprintf('\nPlotting experimental hardware flight log: %s\n', hw_csv);
+    raw_lines = readlines(hw_csv);
+    t_mask = startsWith(raw_lines, "T,");
+    t_lines = raw_lines(t_mask);
+    data = zeros(numel(t_lines), 16);
+    n_valid = 0;
+    for k = 1:numel(t_lines)
+        parts = str2double(split(extractAfter(t_lines(k), 2), ","));
+        if numel(parts) == 16 && all(~isnan(parts))
+            n_valid = n_valid + 1;
+            data(n_valid, :) = parts.';
+        end
+    end
+    data = data(1:n_valid, :);
+    % Find longest contiguous armed block
+    best_seg = []; cur_start = 0;
+    for k = 1:size(data, 1)
+        if data(k, 2) == 1
+            if cur_start == 0
+                cur_start = k;
+            elseif data(k, 1) < data(k-1, 1)
+                if (k - cur_start) > size(best_seg, 1), best_seg = data(cur_start:k-1, :); end
+                cur_start = k;
+            end
+        elseif cur_start > 0
+            if (k - cur_start) > size(best_seg, 1), best_seg = data(cur_start:k-1, :); end
+            cur_start = 0;
+        end
+    end
+    if cur_start > 0 && (size(data, 1) - cur_start + 1) > size(best_seg, 1)
+        best_seg = data(cur_start:end, :);
+    end
+    if size(best_seg, 1) > 750, best_seg = best_seg(251:end, :); end
+    if ~isempty(best_seg)
+        thw = (best_seg(:,1) - best_seg(1,1)) / 1000.0;
+        fig4 = figure('Visible','off','Position',[60 60 1200 750]);
+        subplot(2,2,1); hold on; grid on;
+        plot(thw, best_seg(:,9),  'b--', 'LineWidth', 1.2);
+        plot(thw, best_seg(:,3),  'b-',  'LineWidth', 1.5);
+        plot(thw, best_seg(:,10), 'r--', 'LineWidth', 1.2);
+        plot(thw, best_seg(:,4),  'r-',  'LineWidth', 1.5);
+        xlabel('Time (s)'); ylabel('Angle (deg)');
+        title('A. Roll & Pitch Setpoint Tracking (+-20 deg Steps & 0 deg Hold)');
+        legend('Roll SP','Measured Roll','Pitch SP','Measured Pitch','Location','best');
+
+        subplot(2,2,2); hold on; grid on;
+        plot(thw, best_seg(:,11), 'g--', 'LineWidth', 1.2);
+        plot(thw, best_seg(:,5),  'g-',  'LineWidth', 1.5);
+        plot(thw, best_seg(:,6),  'm:',  'LineWidth', 1.0);
+        plot(thw, best_seg(:,8),  'k:',  'LineWidth', 1.0);
+        xlabel('Time (s)'); ylabel('Yaw (deg) / Rate (deg/s)');
+        title('B. Yaw Heading Tracking (10 deg Steps) & Gyro Rates');
+        legend('Yaw SP','Measured Yaw','Roll Rate gx','Yaw Rate gz','Location','best');
+
+        subplot(2,2,3); hold on; grid on;
+        plot(thw, best_seg(:,13:16), 'LineWidth', 1.2);
+        xlabel('Time (s)'); ylabel('Motor PWM (us)');
+        title('C. Hardware Closed-Loop Motor PWM Outputs (M0..M3)');
+        legend('M0 (FR)','M1 (FL)','M2 (RL)','M3 (RR)','Location','best');
+
+        subplot(2,2,4); hold on; grid on;
+        ur_s = min(max(2.60*(min(max(2.80*(best_seg(:,9)-best_seg(:,3)),-150),150)-best_seg(:,6)),-250),250);
+        up_s = min(max(2.60*(min(max(2.80*(best_seg(:,10)-best_seg(:,4)),-150),150)-best_seg(:,7)),-250),250);
+        m0_mod = min(max(best_seg(:,12) - ur_s + up_s + 35, 1050), 1750);
+        plot(thw, best_seg(:,13), 'r-',  'LineWidth', 1.3);
+        plot(thw, m0_mod,         'b--', 'LineWidth', 1.2);
+        xlabel('Time (s)'); ylabel('PWM Command (us)');
+        title('D. Hardware vs. Analytical Cascaded PID Model (M0 Channel)');
+        legend('Measured Hardware M0','Analytical PID Model','Location','best');
+        saveas(fig4, fullfile(res_dir, 'fig4_hardware_validation.png')); close(fig4);
+    end
+end
+
 fprintf('\nAll figures and metrics_summary.csv saved in: %s\n', res_dir);

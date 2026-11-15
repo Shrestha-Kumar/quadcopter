@@ -44,6 +44,7 @@ reference/
 # Large temporary flight logs (optional: keep sample logs or ignore runtime logs)
 logs/*.csv
 !logs/flight_log_sample.csv
+!logs/final_flight_log.csv
 gazebo/results/*.csv
 
 # Raw photo dumps in root (organized copies are in docs/images/)

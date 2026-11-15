@@ -258,15 +258,15 @@ HTML_PAGE = """<!DOCTYPE html>
         </div>
       </div>
       <div style="margin:8px 0 2px 0">
-        <label>Yaw SP (-20&deg;..+20&deg;, &plusmn;10&deg; steps): <b id="y_sp_lbl" style="color:#93c5fd">0&deg;</b></label>
-        <input id="y_slider" type="range" min="-20" max="20" step="10" value="0" style="width:100%"
+        <label>Yaw SP (-180&deg;..+180&deg;, &plusmn;10&deg; steps): <b id="y_sp_lbl" style="color:#93c5fd">0&deg;</b></label>
+        <input id="y_slider" type="range" min="-180" max="180" step="10" value="0" style="width:100%"
           oninput="setAngle('YAW',this.value,'y_sp_lbl')">
         <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:2px">
-          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',-20,'YAW','y_sp_lbl')">-20&deg;</button>
-          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',-10,'YAW','y_sp_lbl')">-10&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',-90,'YAW','y_sp_lbl')">-90&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',-30,'YAW','y_sp_lbl')">-30&deg;</button>
           <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',0,'YAW','y_sp_lbl')">0&deg;</button>
-          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',10,'YAW','y_sp_lbl')">+10&deg;</button>
-          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',20,'YAW','y_sp_lbl')">+20&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',30,'YAW','y_sp_lbl')">+30&deg;</button>
+          <button class="btn-sec" style="padding:4px 8px;font-size:12px" onclick="setSlider('y_slider',90,'YAW','y_sp_lbl')">+90&deg;</button>
           <button class="btn-cmd" style="padding:4px 8px;font-size:12px" onclick="stepYaw(-10)">Yaw -10&deg; Step</button>
           <button class="btn-cmd" style="padding:4px 8px;font-size:12px" onclick="stepYaw(10)">Yaw +10&deg; Step</button>
         </div>
@@ -321,7 +321,7 @@ function setSlider(sliderId, val, axis, lblId) {
 }
 function stepYaw(delta) {
   const el = document.getElementById('y_slider');
-  const next = Math.max(-20, Math.min(20, parseInt(el.value || '0', 10) + delta));
+  const next = Math.max(-180, Math.min(180, parseInt(el.value || '0', 10) + delta));
   setSlider('y_slider', next, 'YAW', 'y_sp_lbl');
 }
 function levelAll() {
@@ -344,7 +344,7 @@ async function applyCustomPID() {
   const rkd = document.getElementById('g_rkd').value;
   await send('PID:' + akp + ',' + rkp + ',' + rki + ',' + rkd);
 }
-let lastSig = '', staleTicks = 0;
+let lastSig = '', staleTicks = 0, lastTms = -1, tmsStaleTicks = 0;
 document.addEventListener('keydown', (e) => {
   if (e.code === 'Space') { e.preventDefault(); send('STOP'); }
 });
@@ -356,12 +356,23 @@ setInterval(async () => {
     const sb = document.getElementById('state_badge');
     sb.textContent = t.armed ? 'ARMED (ACTIVE)' : 'DISARMED (SAFE)';
     sb.style.color = t.armed ? '#10b981' : '#fbbf24';
+    if (t.t_ms !== lastTms) { lastTms = t.t_ms; tmsStaleTicks = 0; } else { tmsStaleTicks++; }
     const sig = [t.roll, t.pitch, t.yaw, t.gx, t.gy, t.gz].join(',');
     if (sig !== lastSig) { lastSig = sig; staleTicks = 0; } else { staleTicks++; }
+    const allZero = (t.roll === 0 && t.pitch === 0 && t.yaw === 0 && t.gx === 0 && t.gy === 0 && t.gz === 0);
+    const nonZeroGyro = (Math.abs(t.gx) > 0.05 || Math.abs(t.gy) > 0.05 || Math.abs(t.gz) > 0.05);
     const ib = document.getElementById('imu_badge');
-    if (t.t_ms === 0) { ib.textContent = 'IMU: WAITING FOR USB...'; ib.style.color = '#fbbf24'; }
-    else if (staleTicks >= 15) { ib.textContent = 'IMU FROZEN! (Check wires & click SCAN)'; ib.style.color = '#ef4444'; }
-    else { ib.textContent = 'IMU LIVE (50 Hz)'; ib.style.color = '#10b981'; }
+    if (t.t_ms === 0) {
+      ib.textContent = 'IMU: WAITING FOR USB...'; ib.style.color = '#fbbf24';
+    } else if (tmsStaleTicks >= 8) {
+      ib.textContent = 'USB / MCU STREAM STOPPED! (Check USB or Reset)'; ib.style.color = '#ef4444';
+    } else if (allZero && staleTicks >= 10) {
+      ib.textContent = 'IMU DISCONNECTED (0.00) — Auto-recovering / Check I2C'; ib.style.color = '#ef4444';
+    } else if ((nonZeroGyro && staleTicks >= 10) || staleTicks >= 40) {
+      ib.textContent = 'IMU FROZEN! (Auto-recovering / Click SCAN)'; ib.style.color = '#ef4444';
+    } else {
+      ib.textContent = 'IMU LIVE (50 Hz)'; ib.style.color = '#10b981';
+    }
     document.getElementById('roll').textContent = t.roll.toFixed(1);
     document.getElementById('pitch').textContent = t.pitch.toFixed(1);
     document.getElementById('yaw').textContent = t.yaw.toFixed(1);
@@ -418,8 +429,18 @@ class Handler(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
+    my_pid = os.getpid()
+    for p in glob.glob("/proc/[0-9]*/cmdline"):
+        try:
+            pid = int(p.split("/")[2])
+            if pid != my_pid and "wifi_ground_station.py" in open(p, "rb").read().decode("utf-8", "ignore"):
+                os.kill(pid, 9)
+                time.sleep(0.2)
+        except Exception:
+            pass
     bridge = SerialBridge()
     ThreadingHTTPServer.allow_reuse_address = True
+    ThreadingHTTPServer.allow_reuse_port = True
     srv = ThreadingHTTPServer(("0.0.0.0", HTTP_PORT), Handler)
     print(f"=== Quadcopter Wi-Fi Ground Station listening on http://0.0.0.0:{HTTP_PORT} ===")
     print(f"Logging telemetry to: {bridge.log_path}")
