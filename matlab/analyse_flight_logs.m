@@ -1,9 +1,15 @@
 function log = analyse_flight_logs(csv_file, sim_out)
 %ANALYSE_FLIGHT_LOGS  Parse hardware telemetry log from quad_fc and compare with simulation.
-%   log = analyse_flight_logs('data/flight1.csv', out_nom_pid)
+%   log = analyse_flight_logs('final_flight_log.csv', out_nom_pid)
 %   Expects lines produced by `TEL:1` in firmware/quad_fc/quad_fc.ino:
 %     T,t_ms,state,roll,pitch,yaw,gx,gy,gz,roll_sp,pitch_sp,yaw_sp,thr,m0,m1,m2,m3
 
+if nargin < 1 || isempty(csv_file)
+    csv_file = fullfile(fileparts(mfilename('fullpath')), 'final_flight_log.csv');
+    if ~exist(csv_file, 'file')
+        csv_file = fullfile(fileparts(mfilename('fullpath')), '..', 'logs', 'final_flight_log.csv');
+    end
+end
 fid = fopen(csv_file, 'r');
 if fid < 0, error('Cannot open %s', csv_file); end
 raw = [];

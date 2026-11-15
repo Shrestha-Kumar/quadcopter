@@ -6,10 +6,10 @@ function build_simulink_model()
 %   that call the exact same controller and 6-DOF plant functions used in sim_quad.m,
 %   ensuring 100% consistency between script and Simulink simulations.
 
-root_dir = fileparts(fileparts(mfilename('fullpath')));
-sim_dir  = fullfile(root_dir, 'simulink');
+here_dir = fileparts(mfilename('fullpath'));
+sim_dir  = fullfile(here_dir, 'simulink');
 if ~exist(sim_dir, 'dir'), mkdir(sim_dir); end
-addpath(fullfile(root_dir, 'matlab'));
+addpath(here_dir);
 
 mdl = 'quad_sim';
 mdl_path = fullfile(sim_dir, [mdl '.slx']);
@@ -41,7 +41,7 @@ add_line(mdl, 'Ref_Mux/1', 'Ref_Scope/1');
 add_line(mdl, 'Ref_Mux/1', 'Ref_Out/1');
 
 % Model callbacks so running the Simulink model automatically populates workspace logs `sim_out`
-set_param(mdl, 'InitFcn', 'p = params(); ctrl = design_gains(p,''PID'');');
+set_param(mdl, 'InitFcn', 'p = params(); ctrl = design_gains(p,''PID'',struct(''hw'',true));');
 set_param(mdl, 'StopFcn', 'sc=struct(''t_end'',str2double(get_param(bdroot,''StopTime'')),''roll_ref'',@(t)deg2rad(10)*(t>=1),''pitch_ref'',@(t)deg2rad(-8)*(t>=3),''yaw_ref'',@(t)deg2rad(30)*(t>=5),''alt_ref'',@(t)0.5*(t>=1)); sim_out = sim_quad(sc,p,ctrl);');
 
 save_system(mdl, mdl_path);

@@ -68,16 +68,19 @@ $$\dot{T}_i = \frac{T_{cmd, i} - T_i}{\tau_m}$$
 ### 3.2 Control Synthesis (Cascaded PID vs. LQR+I)
 - **Inner Loop (Rate PID)**:
   $$u_{\tau} = K_p (r_{sp} - r) + K_i \int (r_{sp} - r)dt + K_d \frac{d}{dt}(r_{filt})$$
-  - Designed with rate crossover $\omega_r \approx 15\text{ rad/s}$ yielding Phase Margin $\approx 57.1^\circ$.
+  - Roll/Pitch rate crossover $\omega_r = 66.87\text{ rad/s}$ yielding Phase Margin $= 47.1^\circ$ ($\text{GM} = \infty\text{ dB}$).
+  - Yaw rate crossover $\omega_r = 4.11\text{ rad/s}$ yielding Phase Margin $= 75.4^\circ$ ($\text{GM} = \infty\text{ dB}$).
 - **Outer Loop (Attitude P)**:
-  $$r_{sp} = K_{ang} (\eta_{ref} - \eta), \quad K_{ang} = \frac{\omega_r}{4} = 3.75\text{ s}^{-1}$$
-  - Open-loop crossover $\approx 4.6\text{ rad/s}$, Phase Margin $\approx 72.1^\circ$, Gain Margin $= 14.3\text{ dB}$.
-- **Firmware Equivalent Gains**:
-  - $K_{ang} = 3.75$, $K_{p, rate} = 0.5656$, $K_{i, rate} = 0.50$, $K_{d, rate} = 0.0113$.
+  $$r_{sp} = K_{ang} (\eta_{ref} - \eta)$$
+  - Roll/Pitch outer crossover $= 2.80\text{ rad/s}$, Phase Margin $= 78.5^\circ$, Gain Margin $= 35.2\text{ dB}$.
+  - Yaw outer crossover $= 2.47\text{ rad/s}$, Phase Margin $= 56.5^\circ$, Gain Margin $= 17.2\text{ dB}$.
+- **Final Hardware-Tuned Firmware Gains (`firmware/quad_fc/config.h`)**:
+  - Roll/Pitch: $K_{ang} = 2.80$, $K_{p, rate} = 2.60$, $K_{i, rate} = 0.80$, $K_{d, rate} = 0.150$.
+  - Yaw: $K_{ang, yaw} = 2.60$, $K_{p, yawr} = 3.00$, $K_{i, yawr} = 0.65$, $K_{d, yawr} = 0.00$.
 
 ---
 
-## 4. Simulation Suite & Results
+## 4. Simulation Suite & Experimental Results
 
 ### Figure 1: Linear Stability & Frequency Domain
 Open-loop Bode margins and pole-zero locations confirming all closed-loop eigenvalues lie strictly in the stable left-half complex plane:
@@ -91,18 +94,23 @@ Full 6-DOF nonlinear tracking under nominal conditions, sensor noise, $+20\%$ ma
 Side-by-side benchmark of Cascaded PID against state-space LQR with integral action under actuator saturation and plant variations:
 ![PID vs LQR](matlab/results/fig3_pid_vs_lqr.png)
 
-### Performance Metrics Summary
+### Figure 4: Experimental Hardware Flight Validation (`logs/final_flight_log.csv`)
+Real 50 Hz hardware telemetry recorded on the tethered F450 quadcopter demonstrating Roll ($\pm 20^\circ$), Pitch ($-20^\circ$), and Yaw ($10^\circ$ steps up to $+50^\circ / -80^\circ$) tracking and external hand-push disturbance rejection:
+![Hardware Validation](matlab/results/fig4_hardware_validation.png)
+
+### Performance Metrics Summary (`matlab/results/metrics_summary.csv`)
 
 | Scenario | Axis | Overshoot (%) | Rise Time (s) | 2% Settling (s) | 5% Settling (s) | Steady-State Error | RMSE |
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: |
-| **PID Nominal** | Roll ($10^\circ$) | **0.00%** | 0.272 s | 2.751 s | 0.877 s | 0.0000° | 1.538 |
-| **PID Nominal** | Yaw ($30^\circ$) | **0.00%** | 0.590 s | 2.186 s | 1.001 s | 0.0239° | 7.364 |
-| **PID Nominal** | Alt ($0.5\text{ m}$) | 19.88% | 0.993 s | 6.695 s | 5.849 s | -0.0108 m | 0.130 |
-| **PID Noisy** | Roll ($10^\circ$) | 0.42% | 0.274 s | 2.769 s | 0.887 s | 0.0117° | 1.540 |
-| **PID +20% m,J** | Roll ($10^\circ$) | 8.83% | 0.239 s | 2.842 s | 2.623 s | 0.0000° | 1.637 |
-| **PID Disturbance**| Roll ($10^\circ$) | 32.97% | 0.272 s | 4.193 s | 3.794 s | 0.0008° | 1.634 |
-| **LQR Nominal** | Roll ($10^\circ$) | 8.55% | 0.414 s | 4.805 s | 2.187 s | -0.0738° | 1.414 |
-| **LQR Nominal** | Yaw ($30^\circ$) | 11.79% | 0.446 s | 4.999 s | 3.518 s | -0.8232° | 6.911 |
+| **PID Nominal** | Roll ($10^\circ$) | **1.58%** | 0.615 s | 5.458 s | 1.973 s | 0.0044° | 1.645 |
+| **PID Nominal** | Yaw ($30^\circ$) | **13.28%** | 0.369 s | 1.775 s | 1.448 s | -0.1573° | 6.609 |
+| **PID Nominal** | Alt ($0.5\text{ m}$) | 19.63% | 0.996 s | 6.819 s | 5.881 s | 0.0033 m | 0.130 |
+| **PID Noisy** | Roll ($10^\circ$) | 9.07% | 0.625 s | 5.483 s | 5.214 s | 0.0563° | 1.653 |
+| **PID +20% m,J** | Roll ($10^\circ$) | 3.79% | 0.610 s | 6.440 s | 1.981 s | -0.0080° | 1.657 |
+| **PID Disturbance**| Roll ($10^\circ$) | **8.97%** | 0.615 s | 5.497 s | 4.027 s | 0.0282° | 1.652 |
+| **LQR Nominal** | Roll ($10^\circ$) | 14.95% | 0.337 s | 8.831 s | 2.388 s | -0.2073° | 1.856 |
+| **LQR Nominal** | Yaw ($30^\circ$) | 16.95% | 0.427 s | 5.000 s | 3.553 s | -0.7010° | 6.906 |
+| **LQR Disturbance**| Roll ($10^\circ$) | 97.37% | 0.337 s | 5.576 s | 4.657 s | 0.0029° | 2.094 |
 
 ---
 

@@ -1,7 +1,7 @@
 # PS11 Quadcopter – Project Status & Plan (living document)
 
 > Keep this file updated after every task. Other agents or models should read it first.
-> Last updated: 2026-11-15 04:05
+> Last updated: 2026-11-15 17:32
 
 ## 1. Goal
 EE302 PS11: model, control, Simulink simulation and hardware validation of a quadcopter. Altitude hold plus roll, pitch and yaw tracking. See `PS11.pdf`. Deliverables: model, MATLAB/Simulink sim, design calcs, block diagram, experimental data, sim-vs-hardware comparison, report, demo. Safety: props off for initial checks, supervised tests, kill switch.
@@ -28,7 +28,7 @@ EE302 PS11: model, control, Simulink simulation and hardware validation of a qua
   - Connected via 4 jumpers (`VIN`->`5V`, `GND`->`GND`, `SDA`->`20`, `SCL`->`21`).
   - Verified axis conventions in `firmware/quad_fc/config.h`: `IMU_SWAP_RP = 1`, `ROLL_SIGN = -1.0f`, `PITCH_SIGN = +1.0f`, `YAW_SIGN = +1.0f`, `GYRO_ROLL_SIGN = -1.0f`, `GYRO_PITCH_SIGN = +1.0f`, `GYRO_YAW_SIGN = +1.0f`.
   - Hardened `firmware/quad_fc/quad_fc.ino` against EMI/SHTP packet glitches during ESC switching: 100 kHz I2C + `25000 us` wire timeout, drains up to 3 SHTP events per tick, auto-recovers frozen BNO085 streams (`500 ms` armed / `1500 ms` disarmed).
-  - Updated `tools/wifi_ground_station.py` with `±20°` Roll, Pitch, and Yaw sliders (`±10°` Yaw steps + quick step buttons) and `25 ms` serial TX pacing.
+  - Updated `tools/wifi_ground_station.py` with `±20°` Roll/Pitch sliders, `-180°..+180°` Yaw slider (`10°` steps + quick step buttons), accurate IMU stream detection, and automatic port `8080` cleanup on startup.
 
 ## 3. Original firmware (backed up, do not lose)
 - `backup/flash_original.hex`, `.bin`, `eeprom_original.hex`, and `backup/README.md` (restore command).
@@ -45,29 +45,27 @@ EE302 PS11: model, control, Simulink simulation and hardware validation of a qua
 | 1d | Confirm pin mapping from close-up photos & disassembly (PWM 9, 8, 7, 6 + 2x GND) | DONE |
 | 2 | Mathematical model (`matlab/params.m`, `quad_dynamics.m`, `linearize_quad.m`) | DONE |
 | 3 | Control design: Cascaded PID + LQR+I comparison (`matlab/design_gains.m`, updated with `opts.hw = true`) | DONE |
-| 4 | MATLAB/Simulink suite + Linux plots (`matlab/results/fig1..fig3.png` & `matlab/results/hw/fig1..fig3.png`) | DONE |
+| 4 | MATLAB/Simulink suite (`simulink/quad_sim.slx`) + Final Plots (`matlab/results/fig1..fig4.png` & `matlab/results/hw/`) | DONE |
 | 5 | Custom flight controller firmware (`firmware/quad_fc/quad_fc.ino`, `config.h`) + USB/Wi-Fi Ground Station (`tools/wifi_ground_station.py`) | DONE |
 | 6 | BNO085 100 Hz quaternion + gyro verification, I2C recovery, all 4 ESCs verified & calibrated | DONE |
 | 7 | Closed-loop Cascaded PID hardware tuning (`2.80 / 2.60 / 0.80 / 0.150`) + Gazebo 8 3D Browser Studio (`gazebo/`) | DONE |
-| 8 | Final clean hardware log recording (`±5° / ±10°` Roll, Pitch, Yaw steps), regenerate `fig4_hardware_validation.png`, re-pack `quadcopter_matlab.zip`, and compile final report & presentation | NEXT (Tomorrow) |
+| 8 | Final clean hardware log recording (`logs/final_flight_log.csv`), `fig4_hardware_validation.png`, Simulink model (`simulink/quad_sim.slx`), and `quadcopter_matlab.zip` | DONE |
 
-## 5. Remaining Tasks for Tomorrow (Checklist So Nothing Is Forgotten)
-1. **Record Final Clean Hardware Flight Log (`logs/flight_log_YYYYMMDD_HHMMSS.csv`):**
-   - Start the USB Ground Station: `python3 tools/wifi_ground_station.py` and open `http://localhost:8080`.
-   - Level the quadcopter on the rig and click **Zero Level (CAL)**.
-   - Click **ARM (Slow Spin)**, raise the speed slider to hover test throttle (`~1340–1380 us`), and record in one clean session:
-     - **Level hold (`0°`)** for ~8 seconds + gentle hand-push disturbance recovery on Roll, Pitch, and Yaw.
-     - **Roll step sequence** using the new slider/buttons: `0° -> +5° -> 0° -> -5° -> 0° -> +10° -> 0° -> -10° -> 0°` (hold ~5 seconds at each angle).
-     - **Pitch step sequence:** `0° -> +5° -> 0° -> -5° -> 0°`.
-     - **Yaw step sequence (`±10°` steps):** `0° -> +10° -> +20° -> 0° -> -10° -> -20° -> 0°`.
-   - Click **DISARM**.
-2. **Generate Final Hardware Validation Plots (`fig4_hardware_validation.png` & Sim-vs-Hardware Overlay):**
-   - Run `python3 tools/plot_hardware_log.py logs/<newest_flight_log>.csv` to produce the final publication-ready `matlab/results/fig4_hardware_validation.png` (and `.svg`).
-   - Re-pack `quadcopter_matlab.zip` with the updated `matlab/*.m` files (`opts.hw = true`) and the final hardware CSV log.
-3. **Final Presentation & Report (`PS11.pdf` Deliverables):**
-   - Assemble the slide deck & report covering:
-     1. System Architecture & Hardware Pinout (Mega 2560 + BNO085 100 Hz I2C + 4x A2212 1000KV).
-     2. 6-DOF Nonlinear Model & Linearized Transfer Functions (`fig1_linear_stability.png`).
-     3. Cascaded Angle-to-Rate PID vs. LQR+I Control Design (`fig2`, `fig3`, `metrics_summary.csv`).
-     4. Gazebo 8 3D Digital Twin & Browser Studio (`gazebo/`, showing overshoot, undershoot, and wind compensation).
-     5. Experimental Hardware Step-Response & Disturbance Rejection Results (`fig4_hardware_validation.png`).
+## 5. Demo Day Quick-Launch Commands
+1. **Hardware Ground Station (`http://localhost:8080`):**
+   ```bash
+   python3 ~/Projects/quadcopter/tools/wifi_ground_station.py
+   ```
+   - Place quadcopter level on the rig and click **Zero Level (CAL)**.
+   - Click **ARM (Slow Spin)**, raise the throttle slider (`~1340–1380 us`), and demonstrate Roll/Pitch (`±5°..±20°`) and Yaw (`-180°..+180°` in `10°` steps) tracking + hand-push disturbance recovery.
+2. **Gazebo 8 3D Digital Twin Studio (`http://localhost:8090`):**
+   ```bash
+   cd ~/Projects/quadcopter/gazebo && ./run_sim.sh free_flight interactive --alt-hold
+   ```
+   - Open `http://localhost:8090` in browser to demonstrate 3D free-flight and tether-rig attitude tracking, wind gusts (`W_N`, `W_E`, `W_D`), and step-response curves.
+3. **Final Plots & Metrics Location:**
+   - Light-theme high-DPI figures & SVGs: `matlab/results/fig1_linear_stability.png` .. `fig4_hardware_validation.png`
+   - MATLAB Online dark-theme exports: `matlab/results/hw/fig3_robustness_matlab.png`, `matlab/results/hw/fig4_hardware_validation_matlab.png`
+   - Quantitative metrics table: `matlab/results/metrics_summary.csv`
+   - Simulink block diagram: `simulink/quad_sim.slx`
+   - Final recorded hardware telemetry: `logs/final_flight_log.csv`
