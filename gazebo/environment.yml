@@ -1,0 +1,11 @@
+name: gzsim
+channels:
+  - conda-forge
+dependencies:
+  - python=3.10
+  - libgz-sim8
+  - pyyaml
+  - numpy
+  - scipy
+  - matplotlib
+  - pyserial

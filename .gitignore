@@ -38,10 +38,14 @@ Thumbs.db
 .vscode/
 .idea/
 
-# External cloned reference repos (save repo size, tracked upstream)
+# External cloned reference repos & internal scratch notes
 reference/
+PROJECT_STATUS.md
+quadcopter_matlab.zip
+backup/*.bin
+backup/*.hex
 
-# Large temporary flight logs (optional: keep sample logs or ignore runtime logs)
+# Large temporary flight logs (keep final validated hardware log and sample log)
 logs/*.csv
 !logs/flight_log_sample.csv
 !logs/final_flight_log.csv

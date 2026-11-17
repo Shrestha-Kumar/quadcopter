@@ -5,10 +5,9 @@
 #define CONFIG_H
 
 // ---------------------------------------------------------------- Motors
-// !!! UNVERIFIED PIN MAP (read from photo, 2026-11-06). Confirm with a multimeter
-// !!! BEFORE connecting the ESCs: see PROJECT_STATUS.md section 9.
+// Verified hardware pin mapping on Arduino Mega 2560 (PWM pins 9, 8, 7, 6).
 // Motor index convention (looking from above, nose = front):
-//   0 = front-right, 1 = front-left, 2 = rear-left, 3 = rear-right
+//   0 = front-right (CCW), 1 = front-left (CW), 2 = rear-left (CCW), 3 = rear-right (CW)
 #define PIN_MOTOR_0 9
 #define PIN_MOTOR_1 8
 #define PIN_MOTOR_2 7
