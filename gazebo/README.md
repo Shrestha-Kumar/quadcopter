@@ -33,8 +33,8 @@ cd gazebo
 ```
 Then open **`http://localhost:8090`** in your browser to:
 - Switch live between **Free Flight (6-DOF)** and **Tether Rig (3-DOF Attitude)** environments.
-- Click **ARM**, raise **Throttle** (or enable **Altitude Hold**), and command **Roll / Pitch ($\pm 20^\circ$)** and **Yaw ($-180^\circ\text{ to }+180^\circ$ in $10^\circ$ steps)**.
-- Inject 3D **Wind Gust Forces ($W_N, W_E, W_D$)** and tune PID gains in real time.
+- Click **ARM**, raise **Throttle** (or enable **Altitude Hold**), and command **Roll / Pitch (±20°)** and **Yaw (-180° to +180° in 10° steps)**.
+- Inject 3D **Wind Gust Forces** ($W_N,\ W_E,\ W_D$) and tune PID gains in real time.
 
 ### Automated Benchmark Scenarios
 ```bash

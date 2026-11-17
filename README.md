@@ -42,8 +42,8 @@ Quadcopters are inherently **6-DOF, 4-input underactuated, open-loop unstable no
 
 - **16-State Nonlinear 6-DOF Simulator ([`matlab/quad_dynamics.m`](matlab/quad_dynamics.m)):** Models full Newton–Euler rigid-body translational and rotational dynamics, Euler angle kinematics, aerodynamic drag, gyroscopic cross-coupling ($\boldsymbol{\omega}\times\mathbf{J}\boldsymbol{\omega}$), and first-order brushless motor/ESC lag ($\tau_m = 50\text{ ms}$).
 - **Dual-Loop Cascaded PID Architecture ([`matlab/design_gains.m`](matlab/design_gains.m), [`firmware/quad_fc/quad_fc.ino`](firmware/quad_fc/quad_fc.ino)):**
-  - **Inner Angular Rate Loop ($200\text{ Hz}$):** High-bandwidth PID controller operating directly on calibrated $100\text{ Hz}$ BNO085 gyroscope rates ($p, q, r$) with low-pass filtered derivative action ($\alpha_D = 0.30$) and conditional anti-windup clamping.
-  - **Outer Attitude Angle Loop ($200\text{ Hz}$):** Proportional angle controller mapping 3D quaternion-derived Euler angle errors ($\phi, \theta, \psi$) with $22^\circ/\text{s}$ setpoint slew-rate limiting into angular rate commands.
+  - **Inner Angular Rate Loop (200 Hz):** High-bandwidth PID controller operating directly on calibrated $100\text{ Hz}$ BNO085 gyroscope rates ($p, q, r$) with low-pass filtered derivative action ($\alpha_D = 0.30$) and conditional anti-windup clamping.
+  - **Outer Attitude Angle Loop (200 Hz):** Proportional angle controller mapping 3D quaternion-derived Euler angle errors ($\phi, \theta, \psi$) with $22^\circ/\text{s}$ setpoint slew-rate limiting into angular rate commands.
 - **State-Space LQR+I Benchmark ([`matlab/design_gains.m`](matlab/design_gains.m)):** Continuous Algebraic Riccati Equation (CARE) optimal full-state feedback controller augmented with 4 integral error states ($x, y, z, \psi$) compared rigorously against Cascaded PID across 7 test scenarios.
 - **3D Gazebo Harmonic Digital Twin ([`gazebo/fc_sim.py`](gazebo/fc_sim.py)):** Browser-accessible 3D physics studio (`http://localhost:8090`) running the exact C++ `control_step()` algorithm with realistic BNO085 SHTP transport delay FIFOs, asymmetric rotor spin-up/coast-down, and 3D Dryden wind gusts.
 - **Hardware Validation ([`logs/final_flight_log.csv`](logs/final_flight_log.csv)):** Continuous $72\text{ s}$ armed flight test demonstrating $\pm 20^\circ$ Roll/Pitch step tracking, $10^\circ$ incremental Yaw tracking across $[-80^\circ, +50^\circ]$, and external hand-impulse disturbance rejection.
@@ -96,9 +96,9 @@ Quadcopters are inherently **6-DOF, 4-input underactuated, open-loop unstable no
 - **FRONT (Nose, $+x_B$):** USB port and black DC barrel jack side of the Arduino Mega 2560.
 - **BACK (Tail, $-x_B$):** BNO085 IMU side of the Arduino Mega 2560.
 - **Sign Convention (Aircraft NED / Right-Hand Rule Mapped in [`config.h`](firmware/quad_fc/config.h)):**
-  - **$+\text{Roll}$ ($\phi > 0$):** Right wing tilts **DOWN** (`M0`, `M3` side down).
-  - **$+\text{Pitch}$ ($\theta > 0$):** Nose tilts **UP** (`M0`, `M1` side up).
-  - **$+\text{Yaw}$ ($\psi > 0$):** Counter-Clockwise (**CCW**) rotation when viewed from above.
+  - **+Roll ($\phi > 0$):** Right wing tilts **DOWN** (`M0`, `M3` side down).
+  - **+Pitch ($\theta > 0$):** Nose tilts **UP** (`M0`, `M1` side up).
+  - **+Yaw ($\psi > 0$):** Counter-Clockwise (**CCW**) rotation when viewed from above.
 
 ### 3.2 Motor & ESC Pin Mapping and X-Frame Mixer Matrix
 
@@ -134,7 +134,7 @@ $$
 | **Pin 20 (SDA)** | `SDA` | I2C Data (`100 kHz` standard mode for EMI immunity under ESC switching noise) |
 | **Pin 21 (SCL)** | `SCL` | I2C Clock (`100 kHz` + hardware timeout `Wire.setWireTimeout(25000, true)`) |
 
-- **Sensor Reports Enabled ($100\text{ Hz}$ / $10,000\ \mu\text{s}$ Report Interval):**
+- **Sensor Reports Enabled (100 Hz / 10,000 µs Report Interval):**
   1. **`SH2_GAME_ROTATION_VECTOR` (`0x08`):** 6-axis accelerometer + gyroscope quaternion $(q_w, q_x, q_y, q_z)$ immune to magnetic field distortions from the high-current motor power distribution board.
   2. **`SH2_GYROSCOPE_CALIBRATED` (`0x02`):** Direct calibrated body angular velocity $(p, q, r)$ in $\text{rad/s}$ (converted to $\text{deg/s}$) driving the inner rate PID loop without numerical differentiation noise.
 - **Three-Layer I2C Fault Tolerance:**
@@ -148,7 +148,7 @@ $$
 
 ### 4.1 Nonlinear Equations of Motion ([`matlab/quad_dynamics.m`](matlab/quad_dynamics.m))
 
-The complete 16-state vector is $\mathbf{x} = [\mathbf{p}^E;\ \mathbf{v}^E;\ \boldsymbol{\eta};\ \boldsymbol{\omega}^B;\ \mathbf{T}] \in \mathbb{R}^{16}$, where $\mathbf{p}^E = [x, y, z]^T$ is inertial position, $\mathbf{v}^E = [\dot{x}, \dot{y}, \dot{z}]^T$ is inertial velocity, $\boldsymbol{\eta} = [\phi, \theta, \psi]^T$ are ZYX Euler angles, $\boldsymbol{\omega}^B = [p, q, r]^T$ are body angular rates, and $\mathbf{T} = [T_0, T_1, T_2, T_3]^T$ are actual rotor thrusts:
+The complete 16-state vector is $\mathbf{x} \in \mathbb{R}^{16}$, consisting of inertial position $\mathbf{p}^E = [x, y, z]^T$, inertial velocity $\mathbf{v}^E = [\dot{x}, \dot{y}, \dot{z}]^T$, ZYX Euler angles $\boldsymbol{\eta} = [\phi, \theta, \psi]^T$, body angular rates $\boldsymbol{\omega}^B = [p, q, r]^T$, and actual rotor thrusts $\mathbf{T} = [T_0, T_1, T_2, T_3]^T$:
 
 $$
 \begin{aligned}
@@ -168,10 +168,10 @@ $$
 
 ### 4.2 Small-Angle Hover Linearization ([`matlab/linearize_quad.m`](matlab/linearize_quad.m))
 
-Linearizing around hover ($\phi \approx 0, \theta \approx 0, p=q=r=0, U_1 = mg$) decouples the rotational axes into second-order rigid-body integrators cascaded with the first-order motor/ESC lag $G_m(s) = \frac{1}{\tau_m s + 1}$:
+Linearizing around hover ($\phi \approx 0,\ \theta \approx 0,\ p=q=r=0,\ U_1 = mg$) decouples the rotational axes into second-order rigid-body integrators cascaded with the first-order motor/ESC lag $G_m(s) = \frac{1}{\tau_m s + 1}$:
 
 $$
-G_{\text{rate},\phi/\theta}(s) = \frac{P(s)}{\tau_{\phi,\text{cmd}}(s)} = \frac{1}{I_{xx} s (\tau_m s + 1)}, \qquad G_{\text{angle},\phi/\theta}(s) = \frac{\Phi(s)}{\tau_{\phi,\text{cmd}}(s)} = \frac{1}{I_{xx} s^2 (\tau_m s + 1)}
+G_{\text{rate},\phi}(s) = \frac{P(s)}{\tau_{\phi,\text{cmd}}(s)} = \frac{1}{I_{xx} s (\tau_m s + 1)}, \qquad G_{\text{angle},\phi}(s) = \frac{\Phi(s)}{\tau_{\phi,\text{cmd}}(s)} = \frac{1}{I_{xx} s^2 (\tau_m s + 1)}
 $$
 
 $$
@@ -193,25 +193,32 @@ $$
 ```
 
 1. **Outer Attitude P Loop:**
-   $$r_{\text{sp}} = \text{sat}_{[-150, +150]}\!\left(K_{\text{ang}}\,(\eta_{\text{slew}} - \eta)\right), \qquad \left|\dot{\eta}_{\text{slew}}\right| \le 22^\circ/\text{s}$$
+
+$$
+r_{\text{sp}} = \text{sat}_{[-150,\ +150]}\left(K_{\text{ang}}\,(\eta_{\text{slew}} - \eta)\right), \qquad \left|\dot{\eta}_{\text{slew}}\right| \le 22^\circ/\text{s}
+$$
+
 2. **Inner Angular Rate PID Loop (Derivative on Measurement with 1st-Order LPF):**
-   $$u_\tau(k) = K_p\,e_r(k) + K_i \sum_{j=0}^{k} e_r(j)\Delta t - K_d\,\dot{\omega}_{\text{filt}}(k), \qquad \dot{\omega}_{\text{filt}}(k) = (1-\alpha_D)\dot{\omega}_{\text{filt}}(k-1) + \alpha_D \frac{\omega(k)-\omega(k-1)}{\Delta t_{\text{imu}}}$$
+
+$$
+u_\tau(k) = K_p\,e_r(k) + K_i \sum_{j=0}^{k} e_r(j)\Delta t - K_d\,\dot{\omega}_{\text{filt}}(k), \qquad \dot{\omega}_{\text{filt}}(k) = (1-\alpha_D)\dot{\omega}_{\text{filt}}(k-1) + \alpha_D \frac{\omega(k)-\omega(k-1)}{\Delta t_{\text{imu}}}
+$$
 
 ### 5.2 Final Hardware-Tuned Gains vs. Physical SI Gains ([`matlab/design_gains.m`](matlab/design_gains.m))
 
-Using the PWM-to-torque conversion factor $\kappa_{\text{pwm}\to\tau} = 4 d \frac{T_{\max}}{1000\ \mu\text{s}}\frac{180}{\pi} = 0.1533\ \frac{\text{N}\cdot\text{m}}{\mu\text{s}\cdot\text{rad}}$, the firmware gains in [`config.h`](firmware/quad_fc/config.h) map directly to physical SI units:
+Using the PWM-to-torque conversion factor $\kappa_{\text{pwm}\to\tau} = 4 d \frac{T_{\max}}{1000\ \mu\text{s}}\frac{180}{\pi} = 0.1533\ \text{N}\cdot\text{m}/(\mu\text{s}\cdot\text{rad})$, the firmware gains in [`config.h`](firmware/quad_fc/config.h) map directly to physical SI units:
 
 | Loop / Axis | Parameter | Firmware Gain (`config.h`) | Physical SI Equivalent | Closed-Loop Stability Margins |
 | :--- | :---: | :---: | :---: | :--- |
-| **Roll / Pitch Outer Angle** | `ANG_KP` | **$2.80\ (\text{deg/s})/\text{deg}$** | $2.80\text{ s}^{-1}$ | $\omega_c = 2.80\text{ rad/s}$, **$\text{PM} = 78.5^\circ$**, **$\text{GM} = 35.2\text{ dB}$** |
-| **Roll / Pitch Inner Rate** | `RATE_KP`<br>`RATE_KI`<br>`RATE_KD` | **$2.60\ \mu\text{s}/(\text{deg/s})$**<br>**$0.80\ \mu\text{s}/\text{deg}$**<br>**$0.150\ \mu\text{s}/(\text{deg/s}^2)$** | $0.3987\ \text{N}\cdot\text{m}\cdot\text{s/rad}$<br>$0.1227\ \text{N}\cdot\text{m/rad}$<br>$0.0230\ \text{N}\cdot\text{m}\cdot\text{s}^2/\text{rad}$ | $\omega_c = 66.87\text{ rad/s}$, **$\text{PM} = 47.1^\circ$**, **$\text{GM} = \infty\text{ dB}$**<br>Max closed-loop pole $\text{Re}(s) = -0.307\text{ s}^{-1}$ |
-| **Yaw Outer Angle** | `YAW_ANG_KP` | **$2.60\ (\text{deg/s})/\text{deg}$** | $2.60\text{ s}^{-1}$ | $\omega_c = 2.47\text{ rad/s}$, **$\text{PM} = 56.5^\circ$**, **$\text{GM} = 17.2\text{ dB}$** |
-| **Yaw Inner Rate** | `YAWRATE_KP`<br>`YAWRATE_KI`<br>`YAWRATE_KD` | **$3.00\ \mu\text{s}/(\text{deg/s})$**<br>**$0.65\ \mu\text{s}/\text{deg}$**<br>**$0.00$** | $0.0510\ \text{N}\cdot\text{m}\cdot\text{s/rad}$<br>$0.0110\ \text{N}\cdot\text{m/rad}$<br>$0.00$ | $\omega_c = 4.11\text{ rad/s}$, **$\text{PM} = 75.4^\circ$**, **$\text{GM} = \infty\text{ dB}$**<br>Max closed-loop pole $\text{Re}(s) = -0.216\text{ s}^{-1}$ |
-| **Altitude Loop (Sim)** | $K_{p,z}, K_{i,z}, K_{d,z}$ | — | $18.0,\ 6.0,\ 11.0$ | $\omega_c = 8.03\text{ rad/s}$, **$\text{PM} = 22.0^\circ$**, **$\text{GM} = 7.2\text{ dB}$** |
+| **Roll / Pitch Outer Angle** | `ANG_KP` | **2.80 (deg/s)/deg** | $2.80\text{ s}^{-1}$ | $\omega_c = 2.80\text{ rad/s}$, **PM = 78.5°**, **GM = 35.2 dB** |
+| **Roll / Pitch Inner Rate** | `RATE_KP`<br>`RATE_KI`<br>`RATE_KD` | **2.60 µs/(deg/s)**<br>**0.80 µs/deg**<br>**0.150 µs/(deg/s²)** | $0.3987\ \text{N}\cdot\text{m}\cdot\text{s/rad}$<br>$0.1227\ \text{N}\cdot\text{m/rad}$<br>$0.0230\ \text{N}\cdot\text{m}\cdot\text{s}^2/\text{rad}$ | $\omega_c = 66.87\text{ rad/s}$, **PM = 47.1°**, **GM = $\infty$ dB**<br>Max closed-loop pole $\text{Re}(s) = -0.307\text{ s}^{-1}$ |
+| **Yaw Outer Angle** | `YAW_ANG_KP` | **2.60 (deg/s)/deg** | $2.60\text{ s}^{-1}$ | $\omega_c = 2.47\text{ rad/s}$, **PM = 56.5°**, **GM = 17.2 dB** |
+| **Yaw Inner Rate** | `YAWRATE_KP`<br>`YAWRATE_KI`<br>`YAWRATE_KD` | **3.00 µs/(deg/s)**<br>**0.65 µs/deg**<br>**0.00** | $0.0510\ \text{N}\cdot\text{m}\cdot\text{s/rad}$<br>$0.0110\ \text{N}\cdot\text{m/rad}$<br>$0.00$ | $\omega_c = 4.11\text{ rad/s}$, **PM = 75.4°**, **GM = $\infty$ dB**<br>Max closed-loop pole $\text{Re}(s) = -0.216\text{ s}^{-1}$ |
+| **Altitude Loop (Sim)** | $K_{p,z},\ K_{i,z},\ K_{d,z}$ | — | $18.0,\ 6.0,\ 11.0$ | $\omega_c = 8.03\text{ rad/s}$, **PM = 22.0°**, **GM = 7.2 dB** |
 
 ### 5.3 Comparative State-Space LQR+I Synthesis
 
-To benchmark the decentralized Cascaded PID against modern optimal multivariable control, the 12-state rigid-body model is augmented with 4 integral error states $\mathbf{e}_I = [\int e_x, \int e_y, \int e_z, \int e_\psi]^T \in \mathbb{R}^4$ yielding $\mathbf{A}_{\text{aug}} \in \mathbb{R}^{16\times 16}, \mathbf{B}_{\text{aug}} \in \mathbb{R}^{16\times 4}$. Solving the Continuous Algebraic Riccati Equation (CARE):
+To benchmark the decentralized Cascaded PID against modern optimal multivariable control, the 12-state rigid-body model is augmented with 4 integral error states $\mathbf{e}_I = \left[\int e_x,\ \int e_y,\ \int e_z,\ \int e_\psi\right]^T \in \mathbb{R}^4$ yielding $\mathbf{A}_{\text{aug}} \in \mathbb{R}^{16\times 16}$ and $\mathbf{B}_{\text{aug}} \in \mathbb{R}^{16\times 4}$. Solving the Continuous Algebraic Riccati Equation (CARE):
 
 $$
 \mathbf{A}_{\text{aug}}^T \mathbf{P} + \mathbf{P}\mathbf{A}_{\text{aug}} - \mathbf{P}\mathbf{B}_{\text{aug}}\mathbf{R}^{-1}\mathbf{B}_{\text{aug}}^T\mathbf{P} + \mathbf{Q} = \mathbf{0}, \qquad \mathbf{K}_{\text{LQR}} = \mathbf{R}^{-1}\mathbf{B}_{\text{aug}}^T\mathbf{P}
@@ -234,8 +241,8 @@ All publication figures are stored in [`matlab/results/`](matlab/results/) (high
 </p>
 
 **What Figure 1 Shows & Signifies:**
-- **Left & Centre-Left (Open-Loop Bode Magnitude & Phase):** Plots the open-loop frequency response $L(j\omega)$ of the **Roll Inner Rate Loop** ($\omega_c = 66.87\text{ rad/s}, \text{PM} = 47.1^\circ$), **Roll Outer Angle Loop** ($\omega_c = 2.80\text{ rad/s}, \text{PM} = 78.5^\circ, \text{GM} = 35.2\text{ dB}$), **Yaw Outer Loop** ($\omega_c = 2.47\text{ rad/s}, \text{PM} = 56.5^\circ$), and **Altitude Loop** ($\omega_c = 8.03\text{ rad/s}$). The $>20\times$ bandwidth separation between the inner rate loop ($66.87\text{ rad/s}$) and outer angle loop ($2.80\text{ rad/s}$) validates the time-scale separation principle of cascaded control.
-- **Centre-Right (Closed-Loop Pole-Zero Map):** Every closed-loop eigenvalue of both the Roll and Altitude subsystems lies strictly in the **Left-Half Plane ($\text{Re}(s) < 0$)**, proving exponential asymptotic stability.
+- **Left & Centre-Left (Open-Loop Bode Magnitude & Phase):** Plots the open-loop frequency response $L(j\omega)$ of the **Roll Inner Rate Loop** ($\omega_c = 66.87\text{ rad/s}$, $\text{PM} = 47.1^\circ$), **Roll Outer Angle Loop** ($\omega_c = 2.80\text{ rad/s}$, $\text{PM} = 78.5^\circ$, $\text{GM} = 35.2\text{ dB}$), **Yaw Outer Loop** ($\omega_c = 2.47\text{ rad/s}$, $\text{PM} = 56.5^\circ$), and **Altitude Loop** ($\omega_c = 8.03\text{ rad/s}$). The $>20\times$ bandwidth separation between the inner rate loop ($66.87\text{ rad/s}$) and outer angle loop ($2.80\text{ rad/s}$) validates the time-scale separation principle of cascaded control.
+- **Centre-Right (Closed-Loop Pole-Zero Map):** Every closed-loop eigenvalue of both the Roll and Altitude subsystems lies strictly in the **Left-Half Plane** ($\text{Re}(s) < 0$), proving exponential asymptotic stability.
 - **Right (Linear vs. Full 6-DOF Nonlinear Step Overlay):** Compares the $10^\circ$ Roll step response of the linearized transfer function against the full 16-state nonlinear ODE simulator. The two curves overlap almost identically (both exhibiting the characteristic initial counter-torque dip and settling smoothly with $1.58\%$ overshoot), validating the small-angle linearization around hover.
 
 ---
@@ -249,8 +256,8 @@ All publication figures are stored in [`matlab/results/`](matlab/results/) (high
 **What Figure 2 Shows & Signifies:**
 Evaluates the hardware-tuned Cascaded PID controller across all 4 mandatory **PS11 stress scenarios** over a $12\text{ s}$ multi-axis mission ($z: 0\to 1\to 1.5\text{ m}$, $\phi: +10^\circ\text{ at }1\text{ s}\to -5^\circ\text{ at }7\text{ s}$, $\theta: +8^\circ\text{ at }3\text{ s}$, $\psi: +30^\circ\text{ at }5\text{ s}$):
 1. **Nominal (`Blue`):** Zero steady-state error ($0.004^\circ$), $1.58\%$ Roll overshoot, $0.615\text{ s}$ rise time.
-2. **Realistic Sensor Noise + Wind (`Orange`):** Adds white Gaussian IMU noise ($\sigma_\eta = 0.25^\circ, \sigma_\omega = 0.8^\circ/\text{s}$) and continuous sinusoidal wind gusts. The $\alpha_D = 0.30$ derivative low-pass filter prevents high-frequency motor chatter while tracking all setpoints within $\text{RMSE} = 1.65^\circ$.
-3. **$+20\%$ Mass/Inertia & $-15\%$ Thrust Uncertainty (`Green`):** Despite a $20\%$ heavier airframe and $15\%$ weaker motors, the integral rate loop (`RATE_KI = 0.80`) and altitude integrator automatically shift the equilibrium throttle upward, keeping Roll overshoot to just $3.79\%$.
+2. **Realistic Sensor Noise + Wind (`Orange`):** Adds white Gaussian IMU noise ($\sigma_\eta = 0.25^\circ$, $\sigma_\omega = 0.8^\circ/\text{s}$) and continuous sinusoidal wind gusts. The $\alpha_D = 0.30$ derivative low-pass filter prevents high-frequency motor chatter while tracking all setpoints within $\text{RMSE} = 1.65^\circ$.
+3. **+20% Mass/Inertia & -15% Thrust Uncertainty (`Green`):** Despite a $20\%$ heavier airframe and $15\%$ weaker motors, the integral rate loop (`RATE_KI = 0.80`) and altitude integrator automatically shift the equilibrium throttle upward, keeping Roll overshoot to just $3.79\%$.
 4. **External Torque Impulse + Updraft (`Red`):** At $t = 4.0\text{--}4.25\text{ s}$, a $0.18\text{ N}\cdot\text{m}$ roll torque pulse and $-1.5\text{ N}$ vertical gust hit the quadcopter. The $66.87\text{ rad/s}$ inner rate loop limits the peak Roll excursion to $<1^\circ$ ($8.97\%$ relative overshoot) and recovers within $0.4\text{ s}$.
 
 ---
@@ -269,9 +276,9 @@ Evaluates the hardware-tuned Cascaded PID controller across all 4 mandatory **PS
 </details>
 
 **What Figure 3 Shows & Why Cascaded PID Outperforms LQR+I on Hardware:**
-- **Disturbance Rejection (`Top-Middle`):** Under the $t = 4.0\text{ s}$ external roll torque pulse (`0.18 N·m`), **LQR+I suffers a $97.37\%$ overshoot spike ($\sim 20^\circ$)** because its gains are synthesized around a single static state-space model without dedicated inner-loop rate integral damping. **Cascaded PID restricts the disturbance spike to just $8.97\%$** because its dedicated $200\text{ Hz}$ inner rate PID loop immediately counteracts angular acceleration before the outer angle can deviate.
+- **Disturbance Rejection (`Top-Middle`):** Under the $t = 4.0\text{ s}$ external roll torque pulse ($0.18\text{ N}\cdot\text{m}$), **LQR+I suffers a 97.37% overshoot spike (~20°)** because its gains are synthesized around a single static state-space model without dedicated inner-loop rate integral damping. **Cascaded PID restricts the disturbance spike to just 8.97%** because its dedicated $200\text{ Hz}$ inner rate PID loop immediately counteracts angular acceleration before the outer angle can deviate.
 - **Model Mismatch (`Bottom-Left`):** Under $+20\%$ mass/inertia and $-15\%$ motor thrust, LQR+I exhibits $26.43\%$ Roll overshoot and a $-0.22^\circ$ steady-state offset, whereas Cascaded PID maintains $3.79\%$ overshoot and $-0.008^\circ$ error.
-- **Actuator Saturation Margin (`Bottom-Right`):** Plots the 4 individual rotor thrusts $T_1..T_4$. All 4 motors remain strictly within the physical saturation bounds ($[0\text{ N}, 4.2\text{ N}]$) hovering smoothly around $T_{\text{hov}} = 2.005\text{ N}$.
+- **Actuator Saturation Margin (`Bottom-Right`):** Plots the 4 individual rotor thrusts $T_1..T_4$. All 4 motors remain strictly within the physical saturation bounds ($0\text{ N}$ to $4.2\text{ N}$), hovering smoothly around $T_{\text{hov}} = 2.005\text{ N}$.
 
 ### Quantitative Benchmark Table ([`matlab/results/metrics_summary.csv`](matlab/results/metrics_summary.csv))
 
@@ -284,8 +291,8 @@ Evaluates the hardware-tuned Cascaded PID controller across all 4 mandatory **PS
 | **Nominal PID** | Altitude ($0.5\text{ m}$) | 19.63% | 0.996 s | 6.819 s | 5.881 s | 0.0033 m | 0.130 m |
 | **Disturbance PID** | Roll ($10^\circ$ + Pulse) | **8.97%** | 0.615 s | 5.497 s | 4.027 s | 0.0282° | **1.652°** |
 | **Disturbance LQR+I**| Roll ($10^\circ$ + Pulse) | 97.37% | 0.337 s | 5.576 s | 4.657 s | 0.0029° | 2.094° |
-| **ParamVar PID ($+20\%\ m,J$)** | Roll ($10^\circ$) | **3.79%** | 0.610 s | 6.440 s | 1.981 s | **-0.0080°** | **1.657°** |
-| **ParamVar LQR+I ($+20\%\ m,J$)**| Roll ($10^\circ$) | 26.43% | 0.391 s | 8.953 s | 2.464 s | -0.2179° | 1.958° |
+| **ParamVar PID (+20% m, J)** | Roll ($10^\circ$) | **3.79%** | 0.610 s | 6.440 s | 1.981 s | **-0.0080°** | **1.657°** |
+| **ParamVar LQR+I (+20% m, J)**| Roll ($10^\circ$) | 26.43% | 0.391 s | 8.953 s | 2.464 s | -0.2179° | 1.958° |
 | **Realistic Noisy PID** | Roll ($10^\circ$ + Noise) | **9.07%** | 0.625 s | 5.483 s | 5.214 s | 0.0563° | **1.653°** |
 
 ---
@@ -304,15 +311,15 @@ Evaluates the hardware-tuned Cascaded PID controller across all 4 mandatory **PS
 </details>
 
 **What Figure 4 Shows & Signifies (Recorded from [`logs/final_flight_log.csv`](logs/final_flight_log.csv)):**
-Captures a continuous **$72\text{ s}$ armed hardware flight test** ($14,022$ total telemetry rows at $50\text{ Hz}$):
+Captures a continuous **72 s armed hardware flight test** ($14,022$ total telemetry rows at $50\text{ Hz}$):
 1. **Panel 1 — Roll Attitude Tracking (`0–22 s` & `57–72 s`):**
-   - At $t = 4.5\text{ s}$, Roll setpoint steps to **$+20^\circ$**, and at $t = 8.5\text{ s}$ reverses to **$-20^\circ$**. The BNO085 measured Roll (`blue`) tracks the slewed reference (`black dashed`) smoothly and returns to $0^\circ$ at $t = 12\text{ s}$.
+   - At $t = 4.5\text{ s}$, Roll setpoint steps to **+20°**, and at $t = 8.5\text{ s}$ reverses to **-20°**. The BNO085 measured Roll (`blue`) tracks the slewed reference (`black dashed`) smoothly and returns to $0^\circ$ at $t = 12\text{ s}$.
    - During $t = 57\text{--}72\text{ s}$ (while all setpoints are held at $0^\circ$), external physical hand-push disturbances are applied to the frame; the inner rate PID immediately generates restoring motor differential thrust and snaps the frame back to $0^\circ$.
 2. **Panel 2 — Pitch Attitude Tracking (`12–21 s`):**
-   - At $t = 13\text{ s}$, Pitch is commanded to **$-20^\circ$** and held for $6.5\text{ s}$ before returning to $0^\circ$ at $t = 19.5\text{ s}$. Pitch remains tightly locked around $0^\circ$ during all pure Roll and Yaw maneuvers, proving minimal cross-axis coupling.
-3. **Panel 3 — Yaw Attitude Tracking (`21–57 s`, $10^\circ$ Staircase Steps):**
-   - Demonstrates $10^\circ$ step increments from **$0^\circ \to +50^\circ \to 0^\circ \to -50^\circ \to 0^\circ \to -80^\circ \to 0^\circ$**. The `YAWRATE_KI = 0.65` integrator absorbs the steady CW/CCW reaction-torque drag offset while tracking the heading steps cleanly.
-4. **Panel 4 — Motor PWM Signals (`M0..M3`, $1000\text{--}1800\ \mu\text{s}$):**
+   - At $t = 13\text{ s}$, Pitch is commanded to **-20°** and held for $6.5\text{ s}$ before returning to $0^\circ$ at $t = 19.5\text{ s}$. Pitch remains tightly locked around $0^\circ$ during all pure Roll and Yaw maneuvers, proving minimal cross-axis coupling.
+3. **Panel 3 — Yaw Attitude Tracking (`21–57 s`, 10° Staircase Steps):**
+   - Demonstrates $10^\circ$ step increments from **0° → +50° → 0° → -50° → 0° → -80° → 0°**. The `YAWRATE_KI = 0.65` integrator absorbs the steady CW/CCW reaction-torque drag offset while tracking the heading steps cleanly.
+4. **Panel 4 — Motor PWM Signals (`M0..M3`, 1000–1800 µs):**
    - Base hover throttle sits at $\sim 1400\ \mu\text{s}$ while differential mixer commands modulate `M0..M3` between $1250\ \mu\text{s}$ and $1620\ \mu\text{s}$ without saturating the $1750\ \mu\text{s}$ hardware ceiling.
 
 ---
@@ -321,7 +328,7 @@ Captures a continuous **$72\text{ s}$ armed hardware flight test** ($14,022$ tot
 
 Located in [`firmware/quad_fc/quad_fc.ino`](firmware/quad_fc/quad_fc.ino) and [`firmware/quad_fc/config.h`](firmware/quad_fc/config.h):
 
-- **Deterministic $200\text{ Hz}$ Real-Time Loop (`LOOP_US = 5000 µs`):** Executes IMU SHTP packet draining, quaternion-to-Euler conversion, setpoint slew limiting, outer angle P control, inner rate PID control, X-frame mixing, and `Servo` pulse updates every $5\text{ ms}$.
+- **Deterministic 200 Hz Real-Time Loop (`LOOP_US = 5000 µs`):** Executes IMU SHTP packet draining, quaternion-to-Euler conversion, setpoint slew limiting, outer angle P control, inner rate PID control, X-frame mixing, and `Servo` pulse updates every $5\text{ ms}$.
 - **Multi-Layer Hardware Safety Interlocks:**
   1. **Pre-Arm Checks:** Refuses `ARM` if throttle $\ge 1050\ \mu\text{s}$, tilt $> 20^\circ$ (`MAX_TILT_ARM_DEG`), or IMU health is false.
   2. **Tilt Cutoff (`MAX_TILT_CUT_DEG = 55.0°`):** Immediately cuts all 4 motors to $1000\ \mu\text{s}$ and disarms if $|\phi| > 55^\circ$ or $|\theta| > 55^\circ$.
@@ -421,7 +428,7 @@ python3 tools/wifi_ground_station.py
 ```
 - Open **`http://localhost:8080`** in your browser.
 - Place the quadcopter level on the rig and click **Zero Level (CAL)**.
-- Click **ARM (Slow Spin)**, raise the throttle slider to hover (`~1350–1420 µs`), and command **Roll / Pitch ($\pm 20^\circ$)** and **Yaw ($-180^\circ\text{ to }+180^\circ$ in $10^\circ$ steps)**.
+- Click **ARM (Slow Spin)**, raise the throttle slider to hover (`~1350–1420 µs`), and command **Roll / Pitch (±20°)** and **Yaw (-180° to +180° in 10° steps)**.
 - Press **Spacebar** or the red **EMERGENCY STOP / DISARM** button at any time to cut all motors immediately.
 
 ### 10.4 Run the 3D Gazebo Harmonic Digital Twin (`http://localhost:8090`)

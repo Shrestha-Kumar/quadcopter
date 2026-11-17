@@ -41,6 +41,7 @@ Thumbs.db
 # External cloned reference repos & internal scratch notes
 reference/
 PROJECT_STATUS.md
+DRIVE_SUBMISSION_README.txt
 quadcopter_matlab.zip
 backup/*.bin
 backup/*.hex
