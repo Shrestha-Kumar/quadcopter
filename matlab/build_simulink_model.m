@@ -15,9 +15,21 @@ function build_simulink_model()
 %     7. 6-DOF Rigid-Body Quadcopter Plant Dynamics & Scopes (Attitude_Scope, Motor_Thrust_Scope)
 
 here_dir = fileparts(mfilename('fullpath'));
+if isempty(here_dir), here_dir = pwd; end
 repo_dir = fileparts(here_dir);
-sim_dir  = fullfile(repo_dir, 'simulink');
-if ~exist(sim_dir, 'dir'), mkdir(sim_dir); end
+% If repo_dir is read-only (e.g. '/MATLAB Drive' root in MATLAB Online), save inside here_dir/simulink
+sim_dir = fullfile(repo_dir, 'simulink');
+if strcmp(repo_dir, '/') || strcmp(repo_dir, '/MATLAB Drive')
+    sim_dir = fullfile(here_dir, 'simulink');
+end
+if ~exist(sim_dir, 'dir')
+    try
+        mkdir(sim_dir);
+    catch
+        sim_dir = fullfile(here_dir, 'simulink');
+        if ~exist(sim_dir, 'dir'), mkdir(sim_dir); end
+    end
+end
 addpath(here_dir);
 
 mdl = 'quad_sim';
