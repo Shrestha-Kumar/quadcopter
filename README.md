@@ -324,6 +324,35 @@ Captures a continuous **72 s armed hardware flight test** ($14,022$ total teleme
 
 ---
 
+### Figure 5: Simulink Closed-Loop Block Diagram & Scope Response ([`simulink/quad_sim.slx`](simulink/quad_sim.slx))
+
+#### 5A. Complete 6-Stage Closed-Loop Simulink Block Diagram (`docs/images/simulink_block_diagram.jpg`)
+
+<p align="center">
+  <img src="docs/images/simulink_block_diagram.jpg" width="95%" alt="Simulink Closed-Loop Block Diagram (simulink/quad_sim.slx)" />
+</p>
+
+**Architecture of [`simulink/quad_sim.slx`](simulink/quad_sim.slx) (Generated Programmatically via [`matlab/build_simulink_model.m`](matlab/build_simulink_model.m)):**
+1. **Stage 1 — Multi-Axis Step Reference Generators (`Roll_Ref_deg`, `Pitch_Ref_deg`, `Yaw_Ref_deg`, `Alt_Ref_m`):** Applies step inputs of $+10^\circ$ Roll at $t = 1\text{ s}$, $-8^\circ$ Pitch at $t = 3\text{ s}$, $+30^\circ$ Yaw at $t = 5\text{ s}$, and $+0.5\text{ m}$ Altitude at $t = 1\text{ s}$, followed by `deg2rad` conversion blocks.
+2. **Stage 2 — Outer Attitude P Loop (`Outer_P_Roll = 2.80`, `Outer_P_Pitch = 2.80`, `Outer_P_Yaw = 2.60`):** Computes outer angle tracking errors $e_\phi, e_\theta, e_\psi$ and multiplies by the outer proportional gains to produce angular rate setpoints $p_{\text{sp}}, q_{\text{sp}}, r_{\text{sp}}$.
+3. **Stage 3 — Inner Angular Rate PID & Altitude PID Loops (`Rate_PID_Roll`, `Rate_PID_Pitch`, `Rate_PID_Yaw`, `Alt_PID`):** Continuous `PID(s)` controllers with filtered derivative ($N = 50$) operating on angular rate errors $e_p, e_q, e_r$ and altitude error $e_z$, plus `Hover_Thrust_mg` feedforward ($mg = 8.02\text{ N}$) summed into `Total_Thrust_U1`.
+4. **Stage 4 — X-Frame Motor Allocation & ESC Thrust Saturation (`X_Frame_Mixer`, `ESC_Thrust_Sat`, `Rotor_to_Wrench`):** Maps the body control wrench $[\tau_\phi,\ \tau_\theta,\ \tau_\psi,\ U_1]^T$ through the $4\times 4$ inverse allocation matrix into individual motor thrusts $[T_1,\ T_2,\ T_3,\ T_4]^T$, enforces physical ESC thrust saturation ($0.15\text{ N} \le T_i \le 4.20\text{ N}$), and reconstructs the true body wrench applied to the airframe.
+5. **Stage 5 — 6-DOF Rigid-Body Plant + Motor Lag Transfer Functions (`Plant_Rate_Roll/Pitch/Yaw`, `Plant_Alt_z`, `Int_Roll/Pitch/Yaw`):** Models the coupled first-order brushless motor lag ($\tau_m = 0.05\text{ s}$) and rigid-body rotational/translational inertias ($I_{xx}=I_{yy}=0.0086\text{ kg}\cdot\text{m}^2$, $I_{zz}=0.0152\text{ kg}\cdot\text{m}^2$, $m=0.818\text{ kg}$), feeding body rates $(p, q, r)$ back to the inner loop and integrated Euler angles $(\phi, \theta, \psi)$ and altitude $z$ back to the outer loop.
+
+#### 5B. Simulink Scope Multi-Axis Step Response (`docs/images/simulink_scope_output.png`)
+
+<p align="center">
+  <img src="docs/images/simulink_scope_output.png" width="95%" alt="Simulink Attitude_Alt_Scope Output" />
+</p>
+
+**What the Simulink `Attitude_Alt_Scope` Plot Shows ($t = 0\text{ to }10\text{ s}$):**
+- **Yellow Trace — Roll Angle $\phi(t)$ (deg):** Steps toward $+10^\circ$ at $t = 1.0\text{ s}$, exhibits brief transient coupling when individual motors hit the saturation block (`ESC_Thrust_Sat`) during simultaneous altitude climb and pitch/yaw commands, and settles cleanly to the **$+10^\circ$** reference.
+- **Blue Trace — Pitch Angle $\theta(t)$ (deg):** Commands **$-8^\circ$** at $t = 3.0\text{ s}$, demonstrating smooth downward nose pitch response and asymptotic convergence toward $-8^\circ$ as the integral term cancels cross-coupling.
+- **Orange Trace — Yaw Angle $\psi(t)$ (deg):** Steps to **$+30^\circ$** at $t = 5.0\text{ s}$ and rises monotonically with near-zero overshoot, settling smoothly at $+30^\circ$ by $t \approx 6.8\text{ s}$.
+- **Green Trace — Altitude $z(t)$ (m):** Rises from $0\text{ m}$ to **$+0.5\text{ m}$** starting at $t = 1.0\text{ s}$ and holds rock-steady at $0.5\text{ m}$ across all subsequent attitude maneuvers.
+
+---
+
 ## 7. Embedded Flight Controller Firmware & Safety Architecture
 
 Located in [`firmware/quad_fc/quad_fc.ino`](firmware/quad_fc/quad_fc.ino) and [`firmware/quad_fc/config.h`](firmware/quad_fc/config.h):
@@ -353,7 +382,9 @@ quadcopter/
 ├── docs/
 │   └── images/
 │       ├── pinout_pwm.jpg                       # High-res photo of Mega 2560 PWM pins 6, 7, 8, 9
-│       └── pinout_power.jpg                     # High-res photo of Mega 2560 Power & BNO085 I2C pins 20, 21
+│       ├── pinout_power.jpg                     # High-res photo of Mega 2560 Power & BNO085 I2C pins 20, 21
+│       ├── simulink_block_diagram.jpg           # Screenshot of full 6-stage closed-loop Simulink block diagram
+│       └── simulink_scope_output.png            # Screenshot of Simulink Attitude_Alt_Scope step responses
 ├── firmware/
 │   └── quad_fc/
 │       ├── config.h                             # Pinout, X-mixer matrix, safety limits & tuned PID gains
